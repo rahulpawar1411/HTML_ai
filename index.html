@@ -380,63 +380,50 @@
 
         // Send audio message
         async function sendAudioMessage(audioBlob) {
-            try {
-                addMessage('🎤 Voice message sent', true);
+  try {
+    addMessage("🎤 Voice message sent", true);
 
-                const formData = new FormData();
-                // Convert to proper audio format
-                const audioFile = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
-                formData.append('audio', audioFile);
-                formData.append('sessionId', sessionId);
+    const fd = new FormData();
+    fd.append("audio", audioBlob, "voice.wav");
+    fd.append("type", "voice");
 
-                const response = await fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    body: formData
-                });
+    const res = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      body: fd
+    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+    if (!res.ok) throw new Error("Request failed");
 
-                // Get audio response as array buffer
-                const arrayBuffer = await response.arrayBuffer();
-                
-                if (arrayBuffer.byteLength === 0) {
-                    throw new Error('Received empty audio response');
-                }
+    const contentType = res.headers.get("content-type") || "";
 
-                // Create blob from array buffer
-                const audioResponseBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-                
-                // Create object URL and play
-                const audioPlayer = document.getElementById('audioPlayer');
-                const audioUrl = URL.createObjectURL(audioResponseBlob);
-                
-                // Clean up previous URL if exists
-                if (audioPlayer.src && audioPlayer.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(audioPlayer.src);
-                }
-                
-                audioPlayer.src = audioUrl;
-                audioPlayer.style.display = 'block';
-                
-                // Play audio
-                audioPlayer.load();
-                await audioPlayer.play();
+    // ✅ CASE 1: AUDIO RESPONSE
+    if (contentType.includes("audio")) {
+      const buffer = await res.arrayBuffer();
 
-                addMessage('🔊 AI voice response', false);
-                document.getElementById('status').textContent = 'Click microphone to record again';
+      if (buffer.byteLength === 0) {
+        throw new Error("Empty audio buffer");
+      }
 
-                // Clean up blob URL after playback
-                audioPlayer.onended = () => {
-                    URL.revokeObjectURL(audioUrl);
-                };
+      const audioBlob = new Blob([buffer], { type: contentType });
+      const url = URL.createObjectURL(audioBlob);
 
-            } catch (error) {
-                console.error('Error:', error);
-                showError(`Failed to send audio: ${error.message}`);
-                document.getElementById('status').textContent = 'Error. Click to try again';
-            }
+      const audio = new Audio(url);
+      audio.play();
+
+      addMessage("🔊 AI voice reply", false);
+    }
+
+    // ✅ CASE 2: TEXT RESPONSE
+    else {
+      const text = await res.text();
+      addMessage(text, false);
+    }
+
+  } catch (err) {
+    console.error(err);
+    addMessage("⚠️ Voice processed but no audio returned", false);
+  }
+
         }
     </script>
 </body>
